@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED check · Axis Tools</title>
+    <script>
+        // Keeps the launcher's ipcRenderer until axis-api exists (see src/shared/axis.js).
+        window.__axis__ = {
+            set_ipc_renderer: function (ipcRenderer) { window.__axis_pending_ipc__ = ipcRenderer; },
+        };
+    </script>
+</head>
+<body>
+    <div class="layout">
+        <header class="header">
+            <img class="logo" src="/icons/logo.svg" alt="Axis">
+        </header>
+
+        <main class="view">
+            <div class="heading">
+                <h1 class="title">LED check</h1>
+                <p class="description">Hold any button to light its LED. Hold W on controller 1 to sweep the left strip one LED at a time, W on controller 2 for the right strip, in red, then green, then blue. Every light goes through axis-api, like in a game.</p>
+            </div>
+
+            <div class="panels">
+                <section>
+                    <h2 class="panel-title">Buttons</h2>
+                    <div class="controller">
+                        <span class="controller-name">Controller 1</span>
+                        <div class="js-controller-1" style="display: flex; gap: 0.9rem;"></div>
+                    </div>
+                    <div class="controller">
+                        <span class="controller-name">Controller 2</span>
+                        <div class="js-controller-2" style="display: flex; gap: 0.9rem;"></div>
+                    </div>
+                    <p class="panel-note">A held button turns white on screen and its LED lights white on the machine. Controller 2 buttons other than W are not wired yet.</p>
+                </section>
+
+                <section>
+                    <h2 class="panel-title">Side strips</h2>
+                    <div class="strip">
+                        <div class="strip-name">Left strip, W on controller 1</div>
+                        <div class="strip-bar js-strip-left"></div>
+                        <dl class="sweep-values">
+                            <dt>Status</dt><dd class="js-sweep-status-left"></dd>
+                            <dt>Colour</dt><dd class="js-sweep-color-left"></dd>
+                            <dt>Next LED</dt><dd class="js-sweep-index-left"></dd>
+                            <dt>Passes</dt><dd class="js-sweep-passes-left"></dd>
+                        </dl>
+                    </div>
+                    <div class="strip">
+                        <div class="strip-name">Right strip, W on controller 2</div>
+                        <div class="strip-bar js-strip-right"></div>
+                        <dl class="sweep-values">
+                            <dt>Status</dt><dd class="js-sweep-status-right"></dd>
+                            <dt>Colour</dt><dd class="js-sweep-color-right"></dd>
+                            <dt>Next LED</dt><dd class="js-sweep-index-right"></dd>
+                            <dt>Passes</dt><dd class="js-sweep-passes-right"></dd>
+                        </dl>
+                    </div>
+                    <p class="panel-note">The bars mirror what the strips should show. Releasing W pauses its strip, holding it again resumes where it stopped. If the other strip lights instead, the strips are swapped on the board.</p>
+                </section>
+            </div>
+        </main>
+
+        <div class="footnote">LED commands sent: <span class="js-sent">0</span></div>
+
+        <footer class="inputs">
+            <div class="input-indicator"><img class="input-icon" src="/icons/input-home.svg" alt=""><span class="label">Tools</span></div>
+        </footer>
+    </div>
+
+    <script type="module" src="./led.js"></script>
+</body>
+</html>

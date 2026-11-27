@@ -1,0 +1,75 @@
+.tools {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    min-height: 0;
+    max-width: 80rem;
+}
+
+.tool {
+    display: grid;
+    grid-template-columns: 4.4rem 1fr auto;
+    align-items: center;
+    gap: 1.6rem;
+    padding: 0.9rem 1.4rem;
+    border-radius: 1.4rem 1.4rem 1.4rem 0; /* tag shape, square bottom-left */
+    color: var(--grey);
+    transition: background-color 0.4s var(--expo-out), color 0.4s var(--expo-out);
+}
+
+.tool-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.6rem;
+    height: 3.6rem;
+    border-radius: 50%;
+    background: var(--black-1);
+    font-weight: 800;
+    font-size: 1.4rem;
+    color: var(--light-grey);
+    font-variant-numeric: tabular-nums;
+    transition: background-color 0.4s var(--expo-out), color 0.4s var(--expo-out), transform 0.4s var(--expo-out);
+}
+
+.tool-name {
+    font-weight: 800;
+    font-size: 2.4rem;
+    line-height: 1;
+}
+
+.tool-description {
+    margin-top: 0.4rem;
+    max-width: 56rem;
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1.5rem;
+    color: var(--grey);
+    transition: color 0.4s var(--expo-out);
+}
+
+.tool-tags {
+    display: flex;
+    gap: 0.4rem;
+    justify-self: end;
+}
+
+.tool.is-selected {
+    color: var(--white);
+    background-color: var(--black-1);
+}
+
+.tool.is-selected .tool-number {
+    background: var(--white);
+    color: var(--black);
+    transform: scale(1.06);
+}
+
+.tool.is-selected .tool-description { color: var(--light-grey); }
+.tool.is-selected .tag--dim { background-color: var(--black-2); }
+
+.tool.is-opening .tool-number { transform: scale(0.92); }
+
+html:not(.is-axis-machine) .tool { cursor: pointer; }

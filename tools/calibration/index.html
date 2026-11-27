@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joystick calibration · Axis Tools</title>
+    <script>
+        // Keeps the launcher's ipcRenderer until axis-api exists (see src/shared/axis.js).
+        window.__axis__ = {
+            set_ipc_renderer: function (ipcRenderer) { window.__axis_pending_ipc__ = ipcRenderer; },
+        };
+    </script>
+</head>
+<body>
+    <div class="layout">
+        <header class="header">
+            <img class="logo" src="/icons/logo.svg" alt="Axis">
+        </header>
+
+        <!-- Overview: live positions of both joysticks as games see them -->
+        <main class="view js-view-overview">
+            <div class="heading heading--center">
+                <h1 class="title">Joystick check</h1>
+                <p class="description">Move both joysticks. The white dot is what games see, the grey one is the raw board value. If both feel right, go back with Home.</p>
+                <p class="cta">Press <img class="input-icon" src="/icons/input-a.svg" alt="A"> to start calibration</p>
+            </div>
+
+            <div class="pads">
+                <section class="overview-joystick joystick" data-joystick="1">
+                    <h2 class="joystick-name">Joystick 1</h2>
+                    <div class="pad">
+                        <div class="pad-deadzone"></div>
+                        <div class="dot dot--raw js-overview-dot-raw"></div>
+                        <div class="dot dot--game js-overview-dot"></div>
+                    </div>
+                    <div class="values">
+                        <div class="value"><span class="value-label">Game</span><span class="value-number js-overview-game-x">0.00</span><span class="value-number js-overview-game-y">0.00</span></div>
+                        <div class="value"><span class="value-label">Raw</span><span class="value-number js-overview-raw-x">–</span><span class="value-number js-overview-raw-y">–</span></div>
+                    </div>
+                    <div class="tag tag--status js-overview-calibrated"></div>
+                </section>
+
+                <section class="overview-joystick joystick" data-joystick="2">
+                    <h2 class="joystick-name">Joystick 2</h2>
+                    <div class="pad">
+                        <div class="pad-deadzone"></div>
+                        <div class="dot dot--raw js-overview-dot-raw"></div>
+                        <div class="dot dot--game js-overview-dot"></div>
+                    </div>
+                    <div class="values">
+                        <div class="value"><span class="value-label">Game</span><span class="value-number js-overview-game-x">0.00</span><span class="value-number js-overview-game-y">0.00</span></div>
+                        <div class="value"><span class="value-label">Raw</span><span class="value-number js-overview-raw-x">–</span><span class="value-number js-overview-raw-y">–</span></div>
+                    </div>
+                    <div class="tag tag--status js-overview-calibrated"></div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Calibration flow: one joystick at a time -->
+        <main class="view js-view-calibration" hidden>
+            <div class="heading">
+                <div class="steps js-steps"></div>
+                <h1 class="title js-instruction"></h1>
+                <p class="description js-hint"></p>
+                <p class="message js-message"></p>
+            </div>
+
+            <div class="pads">
+                <section class="joystick">
+                    <div class="pad">
+                        <div class="pad-deadzone"></div>
+                        <div class="dot dot--raw js-dot-raw"></div>
+                        <div class="dot dot--live js-dot"></div>
+                    </div>
+                    <div class="values">
+                        <div class="value"><span class="value-label">Raw</span><span class="value-number js-raw-x">–</span><span class="value-number js-raw-y">–</span></div>
+                        <div class="value js-preview-row" hidden><span class="value-label">Game</span><span class="value-number js-preview-x">0.00</span><span class="value-number js-preview-y">0.00</span></div>
+                    </div>
+                    <div class="status js-status"></div>
+                    <span class="js-preview" hidden></span>
+                </section>
+            </div>
+        </main>
+
+        <footer class="inputs">
+            <div class="inputs-container js-inputs"></div>
+        </footer>
+    </div>
+
+
+    <script type="module" src="./calibration.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input debugger · Axis Tools</title>
+    <script>
+        // Keeps the launcher's ipcRenderer until axis-api exists (see src/shared/axis.js).
+        window.__axis__ = {
+            set_ipc_renderer: function (ipcRenderer) { window.__axis_pending_ipc__ = ipcRenderer; },
+        };
+    </script>
+</head>
+<body>
+
+    <header class="header">
+        <h1><a class="back" href="/?from=inputs">← Tools</a> Input debugger <span class="back-hint">Home / Escape to go back</span></h1>
+        <div class="pills">
+            <span class="pill" id="pill-source">Source: browser</span>
+            <span class="pill" id="pill-ipc">ipcRenderer: no</span>
+            <span class="pill" id="pill-gamepads">Gamepads: 0</span>
+            <span class="pill" id="pill-serial">Serial: none</span>
+            <span class="pill" id="pill-sleep">Awake</span>
+        </div>
+    </header>
+
+    <div class="layout">
+    <main class="grid">
+
+        <!-- Joystick cards are cloned from this template -->
+        <template id="joystick-template">
+            <section class="card joystick">
+                <h2>Joystick <span class="js-id"></span> <span class="rate js-rate">0 Hz</span></h2>
+
+                <div class="joystick-body">
+                    <canvas class="js-canvas" width="150" height="150"></canvas>
+
+                    <div class="readouts">
+                        <h3>Normalized (what your game gets)</h3>
+                        <table>
+                            <tr><th>x</th><td class="js-nx">0.000</td></tr>
+                            <tr><th>y</th><td class="js-ny">0.000</td></tr>
+                            <tr><th>magnitude</th><td class="js-nmag">0.000</td></tr>
+                            <tr><th>angle</th><td class="js-nangle">0°</td></tr>
+                        </table>
+
+                        <h3>Raw ADC (machine only)</h3>
+                        <table>
+                            <tr><th>x</th><td class="js-rx">–</td></tr>
+                            <tr><th>y</th><td class="js-ry">–</td></tr>
+                            <tr><th>rest</th><td class="js-rest">–</td></tr>
+                            <tr><th>min / max x</th><td class="js-rminmaxx">–</td></tr>
+                            <tr><th>min / max y</th><td class="js-rminmaxy">–</td></tr>
+                        </table>
+                        <p class="hint">API calibration: x 18–840, y 36–867. Values outside clip at ±1.</p>
+                        <div class="actions">
+                            <button class="js-reset-range">Reset min/max</button>
+                            <button class="js-recenter">Set rest</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quickmove">
+                    <span class="qm js-qm-left">◀ left <b>0</b></span>
+                    <span class="qm js-qm-up">▲ up <b>0</b></span>
+                    <span class="qm js-qm-down">▼ down <b>0</b></span>
+                    <span class="qm js-qm-right">▶ right <b>0</b></span>
+                </div>
+
+                <canvas class="js-chart chart" width="460" height="60"></canvas>
+                <p class="hint">Chart: <span class="swatch x"></span>x <span class="swatch y"></span>y over the last ~5s. Dashed lines = API calibration bounds.</p>
+            </section>
+        </template>
+
+        <div id="joysticks" class="joysticks"></div>
+
+        <!-- Alternative controller cards and field charts are cloned from these templates -->
+        <template id="alternative-template">
+            <article class="alternative">
+                <h3 class="alternative-title">
+                    <span class="js-name"></span>
+                    <span class="alternative-meta js-meta"></span>
+                    <span class="rate js-rate">0 Hz</span>
+                </h3>
+                <div class="badges js-badges"></div>
+                <div class="fields js-fields"></div>
+            </article>
+        </template>
+
+        <template id="field-template">
+            <div class="field">
+                <div class="field-head">
+                    <span class="field-name js-field-name"></span>
+                    <span class="field-value js-field-value"></span>
+                </div>
+                <canvas class="js-field-chart field-chart"></canvas>
+                <div class="field-range js-field-range"></div>
+            </div>
+        </template>
+
+
+        <section class="card">
+            <h2>Buttons</h2>
+            <div class="button-groups">
+                <div class="button-group">
+                    <h3>Group 1</h3>
+                    <div class="buttons" data-group="1"></div>
+                </div>
+                <div class="button-group">
+                    <h3>Group 2</h3>
+                    <div class="buttons" data-group="2"></div>
+                </div>
+                <div class="button-group">
+                    <h3>Home</h3>
+                    <div class="buttons" data-group="0"></div>
+                </div>
+            </div>
+            <p class="hint">Keyboard emulation: group 1 = Q D Z S Space · group 2 = ← → ↑ ↓ Enter. Gamepad buttons 0–3 = A X I S (group 1), 4–7 = A X I S (group 2).</p>
+        </section>
+
+        <section class="card">
+            <h2>Settings (live)</h2>
+            <label>Deadzone <input type="range" id="deadzone" min="0" max="0.6" step="0.01" value="0.2"> <span id="deadzone-value">0.20</span></label>
+            <label>Quickmove threshold <input type="range" id="threshold" min="0" max="0.5" step="0.01" value="0.1"> <span id="threshold-value">0.10</span></label>
+            <label>Trail length <input type="range" id="trail" min="0" max="200" step="10" value="60"> <span id="trail-value">60</span></label>
+            <p class="hint">Deadzone and threshold are written to Axis.joystick1 / joystick2 so you can tune the API config.</p>
+        </section>
+
+        <section class="card log-card">
+            <h2>Event log <button id="clear-log">Clear</button></h2>
+            <pre id="log" class="log"></pre>
+        </section>
+
+    </main>
+
+    <aside class="card alternatives-card">
+        <h2>Alternative controllers <span class="rate" id="alternatives-count">0 connected</span></h2>
+        <div id="alternatives" class="alternatives"></div>
+        <p class="hint" id="alternatives-empty">No alternative controller yet. Plug a board that answers the launcher's handshake (see arduino/scripts/AlternativeController). Only works on the machine.</p>
+        <p class="hint">One chart per numeric field: the dot is the current value, the left half the last ~5s, scaled to the values seen since connection. Text fields are badges.</p>
+    </aside>
+    </div>
+
+    <script type="module" src="./inputs.js"></script>
+</body>
+</html>
