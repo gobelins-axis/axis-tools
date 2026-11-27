@@ -33,12 +33,11 @@ hub page) opens each tool. See `../CLAUDE.md` for the ecosystem and the IPC cont
 
 | id | Origin | Talks to the launcher with |
 |---|---|---|
-| `calibration` | `axis-launcher-electron/src/calibration` | `joystick:raw`, `calibration:get` (invoke), `calibration:apply/save/discard` |
+| `calibration` | `axis-launcher-electron/src/calibration` (removed there) | `joystick:raw`, `calibration:get` (invoke), `calibration:apply/save/discard` |
 | `inputs` | the `debugger/` project (gobelins-axis/joystick-debugger) | raw `joystick:move` via `Axis.ipcRenderer`; keeps its own light dev-tool CSS, no base.css |
-| `led` | `axis-launcher-electron/src/led-debug` | axis-api LED API only, `led:clear` on unload |
-| `alternative` | `axis-launcher-electron/src/alternative-debug` | `alternative:list` (invoke), `alternative:connected/disconnected/message/raw` |
+| `led` | `axis-launcher-electron/src/led-debug` (removed there) | axis-api LED API only, `led:clear` on unload |
+| `alternative` | `axis-launcher-electron/src/alternative-debug` (removed there) | `alternative:list` (invoke), `alternative:connected/disconnected/message/raw` |
 
-The launcher copies still exist and are still what its dev toggles and the W+S combo
-open; this project is the replacement. Calibration drafts are dropped by the launcher on
-any page load that is not its own calibration URL, which is also true for this site, so
-an unsaved preview never survives leaving the page.
+The launcher has no tool pages anymore: this site is the only way to reach the tools
+(through the menu, as a game). The launcher drops calibration drafts whenever the window
+starts loading a page, so an unsaved preview never survives leaving the calibration page.
