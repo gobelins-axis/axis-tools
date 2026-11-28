@@ -1,87 +1,84 @@
 /* LED check styles, on top of src/shared/base.css. */
 
-/* Panels */
-.panels {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4rem;
-    align-content: start;
-    min-height: 0;
+/* 3D machine behind everything; the layout floats above and lets the
+   mouse through to the orbit controls except where text sits. */
+.scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
-/* Button echo */
-.controller {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    margin-bottom: 1.2rem;
+.layout {
+    pointer-events: none;
 }
 
-.controller-name {
-    width: 6rem;
+.loading {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     font-weight: 700;
     font-size: 1.25rem;
-    color: var(--light-grey);
+    color: var(--grey);
 }
 
-.badge {
+.heading { max-width: 30rem; }
+
+.description { max-width: 28rem; }
+
+/* Strip stats, bottom left above the footnote */
+.view { grid-template-rows: auto 1fr; }
+
+.sweeps {
+    align-self: end;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 3.2rem;
-    height: 3.2rem;
-    border-radius: 50%;
-    background: var(--black-1);
-    transition: background 0.08s linear, transform 0.08s linear;
-}
-
-.badge-icon { width: 1.64rem; height: 1.64rem; opacity: 0.5; }
-.badge-letter { font-weight: 800; font-size: 1.4rem; color: var(--light-grey); }
-
-.badge.is-held { background: var(--white); transform: scale(1.08); }
-.badge.is-held .badge-icon { filter: invert(1); opacity: 1; }
-.badge.is-held .badge-letter { color: var(--black); }
-
-/* Strip sweep */
-.strip {
+    flex-direction: column;
+    gap: 1.6rem;
     margin-bottom: 1.6rem;
 }
 
-.strip-name {
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--light-grey);
-    margin-bottom: 0.4rem;
+.sweep {
+    padding-left: 1rem;
+    border-left: 0.2rem solid var(--black-2);
+    transition: border-color 0.3s var(--expo-out);
 }
 
-.strip-bar {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-    gap: 0.12rem;
-    height: 1.4rem;
+.sweep.is-running { border-left-color: var(--white); }
+
+.sweep-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    font-weight: 800;
+    font-size: 1.4rem;
+    line-height: 1;
 }
 
-.cell {
+.sweep-key {
+    padding: 0.1rem 0.45rem 0.18rem;
+    border-radius: 0.6rem 0.6rem 0.6rem 0;
     background: var(--black-1);
-    border-radius: 0.15rem;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--light-grey);
 }
 
-.cell.is-next { outline: 2px solid var(--white); outline-offset: -2px; }
+.sweep.is-running .sweep-key { background: var(--white); color: var(--black); }
 
 .sweep-values {
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: 7rem auto;
+    justify-content: start;
     column-gap: 1.2rem;
-    row-gap: 0.3rem;
+    row-gap: 0.2rem;
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1rem;
     line-height: 1.3;
     color: var(--light-grey);
     font-variant-numeric: tabular-nums;
-    margin-top: 0.6rem;
 }
 
 .sweep-values dt { color: var(--grey); }
-
-.panel-note { margin-top: 1rem; }

@@ -8,7 +8,7 @@ list, press Home again to quit.
 |---|---|---|
 | Joystick calibration | Live check of both joysticks, then guided calibration (centre, range, direction), saved on the machine | Machine, main board |
 | Input debugger | Joysticks, buttons and alternative controllers with charts, raw values and live settings | Works in a browser too |
-| LED check | Lights each button while held, sweeps both side strips in red / green / blue | Machine, V6-LED firmware |
+| LED check | 3D machine mirroring the real one: a held button moves in and lights, W1 / W2 sweep the left / right strip in red / green / blue | Machine, V6-LED firmware |
 | Alternative controllers | Every USB board the launcher sees, handshake state, last message, raw lines | Machine |
 
 ## Run locally
@@ -20,7 +20,7 @@ npm run dev                   # http://localhost:8090
 ```
 
 Keyboard emulation: controller 1 = Q D Z S Space, controller 2 = ← → ↑ ↓ Enter,
-Escape = Home. On the hub, Z / S or ↑ / ↓ move, Q or ← opens.
+Escape = Home. On the hub, ↑ / ↓ move, Enter or A opens.
 
 `npm run build` writes the static site to `dist/` (Netlify config included).
 

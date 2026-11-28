@@ -12,6 +12,10 @@
     </script>
 </head>
 <body>
+    <!-- 3D machine, full screen behind the layout (machine.js) -->
+    <canvas class="scene js-canvas"></canvas>
+    <p class="loading js-loading">Loading the machine…</p>
+
     <div class="layout">
         <header class="header">
             <img class="logo" src="/icons/logo.svg" alt="Axis">
@@ -20,46 +24,27 @@
         <main class="view">
             <div class="heading">
                 <h1 class="title">LED check</h1>
-                <p class="description">Hold any button to light its LED. Hold W on controller 1 to sweep the left strip one LED at a time, W on controller 2 for the right strip, in red, then green, then blue. Every light goes through axis-api, like in a game.</p>
+                <p class="description">Press any button to light its LED. Hold W1 to sweep the left strip, W2 for the right one, in red, then green, then blue. Push a joystick left or right to look at the sides. Every light goes through axis-api, like in a game.</p>
             </div>
 
-            <div class="panels">
-                <section>
-                    <h2 class="panel-title">Buttons</h2>
-                    <div class="controller">
-                        <span class="controller-name">Controller 1</span>
-                        <div class="js-controller-1" style="display: flex; gap: 0.9rem;"></div>
-                    </div>
-                    <div class="controller">
-                        <span class="controller-name">Controller 2</span>
-                        <div class="js-controller-2" style="display: flex; gap: 0.9rem;"></div>
-                    </div>
-                    <p class="panel-note">A held button turns white on screen and its LED lights white on the machine. Controller 2 buttons other than W are not wired yet.</p>
+            <div class="sweeps">
+                <section class="sweep js-sweep-left">
+                    <h2 class="sweep-title">Left strip <span class="sweep-key">W1</span></h2>
+                    <dl class="sweep-values">
+                        <dt>Status</dt><dd class="js-sweep-status-left"></dd>
+                        <dt>Colour</dt><dd class="js-sweep-color-left"></dd>
+                        <dt>Next LED</dt><dd class="js-sweep-index-left"></dd>
+                        <dt>Passes</dt><dd class="js-sweep-passes-left"></dd>
+                    </dl>
                 </section>
-
-                <section>
-                    <h2 class="panel-title">Side strips</h2>
-                    <div class="strip">
-                        <div class="strip-name">Left strip, W on controller 1</div>
-                        <div class="strip-bar js-strip-left"></div>
-                        <dl class="sweep-values">
-                            <dt>Status</dt><dd class="js-sweep-status-left"></dd>
-                            <dt>Colour</dt><dd class="js-sweep-color-left"></dd>
-                            <dt>Next LED</dt><dd class="js-sweep-index-left"></dd>
-                            <dt>Passes</dt><dd class="js-sweep-passes-left"></dd>
-                        </dl>
-                    </div>
-                    <div class="strip">
-                        <div class="strip-name">Right strip, W on controller 2</div>
-                        <div class="strip-bar js-strip-right"></div>
-                        <dl class="sweep-values">
-                            <dt>Status</dt><dd class="js-sweep-status-right"></dd>
-                            <dt>Colour</dt><dd class="js-sweep-color-right"></dd>
-                            <dt>Next LED</dt><dd class="js-sweep-index-right"></dd>
-                            <dt>Passes</dt><dd class="js-sweep-passes-right"></dd>
-                        </dl>
-                    </div>
-                    <p class="panel-note">The bars mirror what the strips should show. Releasing W pauses its strip, holding it again resumes where it stopped. If the other strip lights instead, the strips are swapped on the board.</p>
+                <section class="sweep js-sweep-right">
+                    <h2 class="sweep-title">Right strip <span class="sweep-key">W2</span></h2>
+                    <dl class="sweep-values">
+                        <dt>Status</dt><dd class="js-sweep-status-right"></dd>
+                        <dt>Colour</dt><dd class="js-sweep-color-right"></dd>
+                        <dt>Next LED</dt><dd class="js-sweep-index-right"></dd>
+                        <dt>Passes</dt><dd class="js-sweep-passes-right"></dd>
+                    </dl>
                 </section>
             </div>
         </main>
