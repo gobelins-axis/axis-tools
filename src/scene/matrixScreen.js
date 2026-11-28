@@ -3,7 +3,11 @@
 //
 // Each column drops one glyph per step at its own pace. The head glyph is
 // pale, the trail turns green and fades out under a translucent black fill.
-
+//
+// The rain runs on its own canvas; the texture's canvas is the rain plus what
+// the scene drives for the dive into the input debugger:
+//   blank   true  black instead of the rain
+//   light   0..1  white on top (1 = a plain white screen, glows)
 import { CanvasTexture, LinearFilter } from 'three';
 
 // Half-width katakana + digits.
@@ -23,7 +27,14 @@ export class MatrixScreen {
         this.canvas = document.createElement('canvas');
         this.canvas.width = width;
         this.canvas.height = height;
-        this.context = this.canvas.getContext('2d');
+        this.output = this.canvas.getContext('2d');
+        this.rain = document.createElement('canvas');
+        this.rain.width = width;
+        this.rain.height = height;
+        this.context = this.rain.getContext('2d');
+        this.light = 0;
+        this.blank = false;
+        this.effects = false; // last composed frame had effects
         this.fontSize = fontSize;
         this.stepMs = stepMs;
         this.rows = Math.ceil(height / fontSize);
@@ -41,7 +52,7 @@ export class MatrixScreen {
         this.context.fillRect(0, 0, width, height);
         // Pre-run so the screen is already full of rain on the first frame.
         for (let i = 0; i < this.rows * 3; i++) this._step();
-        this.texture.needsUpdate = true;
+        this._compose();
     }
 
     _newColumn(scatter) {
@@ -55,14 +66,41 @@ export class MatrixScreen {
 
     // Call every frame; draws only when a step is due.
     update(time) {
-        if (time - this.last < this.stepMs) return;
-        this.last = time;
-        this._step();
+        const stepped = time - this.last >= this.stepMs;
+        if (stepped) {
+            this.last = time;
+            this._step();
+        }
+        const effects = this.light > 0 || this.blank;
+        // Effects change every frame; plain rain only when it moved (and
+        // once more to clear the last effect frame).
+        if (stepped || effects || this.effects) this._compose();
+        this.effects = effects;
+    }
+
+    _compose() {
+        const { output: ctx, rain, canvas, light, blank } = this;
+        const { width, height } = canvas;
+        ctx.globalAlpha = 1;
+        if (blank) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+        } else {
+            ctx.drawImage(rain, 0, 0);
+        }
+
+        if (light > 0) {
+            ctx.globalAlpha = Math.min(1, light);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.globalAlpha = 1;
+        }
+
         this.texture.needsUpdate = true;
     }
 
     _step() {
-        const { context: ctx, fontSize, canvas } = this;
+        const { context: ctx, fontSize, rain: canvas } = this;
         ctx.fillStyle = FADE;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = `700 ${fontSize}px monospace`;

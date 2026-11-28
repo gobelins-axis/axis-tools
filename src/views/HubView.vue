@@ -1,5 +1,6 @@
 <script setup>
-// Hub: the tool picker, first page of the site.
+// Hub: the tool picker, first page of the site. Text on the left, the 3D
+// machine (screen off) on the right half.
 //
 // Joystick up/down (either one) or the keyboard arrows move the selection,
 // A (or Enter / the A key on a keyboard) opens the tool, Home quits to the
@@ -14,6 +15,7 @@ import { Axis } from '../axis/axis.js';
 import { useAxisEvents } from '../axis/useAxisEvents.js';
 import { useExitOverlay } from '../axis/useExitOverlay.js';
 import { TOOLS } from '../tools.js';
+import { diveIntoScreen } from '../scene/stage.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -22,6 +24,7 @@ const exitOverlay = useExitOverlay();
 
 const index = ref(Math.max(0, TOOLS.findIndex((tool) => tool.id === route.query.from)));
 const openingIndex = ref(-1);
+const leaving = ref(false); // UI fading out for the dive into the screen
 
 const inputs = [
     { key: 'a', label: 'Open' },
@@ -38,7 +41,21 @@ function open(next = index.value) {
     if (openingIndex.value !== -1 || exitOverlay.isOpen()) return;
     index.value = next;
     openingIndex.value = next;
-    router.push({ name: TOOLS[next].id });
+    const tool = TOOLS[next];
+
+    // The input debugger opens through the machine: the UI fades out, the
+    // camera faces the screen, which lights up and swallows the view.
+    if (tool.id === 'inputs') {
+        leaving.value = true;
+        // Without the scene (still loading, reduced motion) it opens at
+        // once; if something else navigated meanwhile, it doesn't.
+        diveIntoScreen().then(() => {
+            if (route.name === 'hub') router.push({ name: tool.id });
+        });
+        return;
+    }
+
+    router.push({ name: tool.id });
 }
 
 on(Axis, 'keydown', (e) => {
@@ -64,7 +81,7 @@ on(window, 'keydown', (e) => {
 </script>
 
 <template>
-    <div class="layout">
+    <div class="layout" :class="{ 'is-leaving': leaving }">
         <AppHeader />
 
         <main class="view view--hub">
@@ -93,32 +110,40 @@ on(window, 'keydown', (e) => {
 </template>
 
 <style scoped>
-/* One centred column (title, description, tool list), vertically centred
-   under the header. The selected tool sits on the cabinet's tag shape
-   (square bottom-left, like the menu's GameTag); the others recede. */
+.layout { transition: opacity 0.5s var(--expo-out); }
+.layout.is-leaving { opacity: 0; }
+
+/* Split screen: one left-aligned column (title, description, tool list),
+   vertically centred; the right half is the 3D machine (src/scene, 'hub'
+   stage). The selected tool sits on the cabinet's tag shape (square
+   bottom-left, like the menu's GameTag), hanging out to the left so every
+   tool name lines up with the title. */
 
 .view--hub {
     align-content: center;
-    justify-items: center;
+    justify-items: start;
     grid-template-rows: auto auto;
     gap: 3.2rem;
+    width: 44rem;
+    padding-left: 1.8rem; /* the hanging tag's edge lines up with the logo */
     padding-bottom: 3rem; /* optical centre, above the inputs row */
-    text-align: center;
 }
 
 .view--hub .heading { margin-top: 0; }
-.view--hub .description { max-width: 48rem; margin-left: auto; margin-right: auto; text-wrap: balance; }
+.view--hub .description { max-width: 32rem; text-wrap: pretty; }
 
 .tools {
     list-style: none;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    width: 58rem;
+    width: 100%;
 }
 
 .tool {
-    padding: 1.1rem 2.4rem 1.3rem;
+    --hang: 1.8rem;
+    margin-left: calc(-1 * var(--hang));
+    padding: 1.1rem 2rem 1.3rem var(--hang);
     border-radius: 1.4rem 1.4rem 1.4rem 0;
     color: var(--grey);
     transition: background-color 0.4s var(--expo-out), color 0.4s var(--expo-out);
@@ -132,10 +157,11 @@ on(window, 'keydown', (e) => {
 
 .tool-description {
     margin-top: 0.5rem;
+    max-width: 30rem;
     font-weight: 700;
     font-size: 1.15rem;
     line-height: 1.5rem;
-    text-wrap: balance;
+    text-wrap: pretty;
     color: var(--grey);
     opacity: 0.7;
     transition: color 0.4s var(--expo-out), opacity 0.4s var(--expo-out);

@@ -4,13 +4,14 @@
 // wires the events and renders the two views. In a browser there is no IPC:
 // the page renders but nothing can be calibrated.
 
-import { computed, onBeforeUnmount } from 'vue';
+import { computed, watch, onBeforeUnmount } from 'vue';
 import AppHeader from '../../components/AppHeader.vue';
 import InputIndicators from '../../components/InputIndicators.vue';
 import { Axis } from '../../axis/axis.js';
 import { useAxisEvents } from '../../axis/useAxisEvents.js';
 import { useIpc } from '../../axis/useIpc.js';
 import { useExitOverlay } from '../../axis/useExitOverlay.js';
+import { setStage } from '../../scene/stage.js';
 import { JOYSTICK_IDS, STEPS, TEXTS, createCalibration, rawToPad, dotTransform } from './calibration.js';
 
 const { on } = useAxisEvents();
@@ -118,6 +119,14 @@ ready((ipc) => {
         .catch(() => {});
 });
 
+// 3D background: both sticks on the overview and once done, otherwise the
+// joystick being calibrated. Moving a stick only tilts it (src/scene/stage.js).
+watch(
+    () => (state.view === 'overview' || state.isDone ? null : currentJoystickId()),
+    (joystick) => setStage('calibration', { joystick }),
+    { immediate: true },
+);
+
 // Leaving mid-test (Home -> back to the hub, or the launcher reloading the
 // window) must not keep an unsaved preview applied to the joystick.
 on(window, 'beforeunload', calibration.discardAppliedDrafts);
@@ -130,7 +139,7 @@ onBeforeUnmount(calibration.discardAppliedDrafts);
 
         <!-- Overview: live positions of both joysticks as games see them -->
         <main v-if="state.view === 'overview'" class="view">
-            <div class="heading heading--center">
+            <div class="heading">
                 <h1 class="title">Joystick check</h1>
                 <p class="description">Move both joysticks. The white dot is what games see, the grey one is the raw board value. If both feel right, go back with Home.</p>
                 <p class="cta">Press <img class="input-icon" src="/icons/input-a.svg" alt="A"> to start calibration</p>
@@ -194,16 +203,9 @@ onBeforeUnmount(calibration.discardAppliedDrafts);
 .view { gap: 1.2rem; }
 .description { max-width: 34rem; }
 
-.heading--center {
-    max-width: none;
-    justify-self: center;
-    text-align: center;
-}
-
-.heading--center .description {
-    margin-left: auto;
-    margin-right: auto;
-}
+/* Left column; the 3D machine frames the sticks on the right half
+   (src/scene, 'calibration' stage). */
+.view { width: 50%; }
 
 /* Call to action: the button glyph sits inline in the sentence */
 .cta {
@@ -252,8 +254,8 @@ onBeforeUnmount(calibration.discardAppliedDrafts);
 .pads {
     display: flex;
     align-items: flex-start;
-    justify-content: center;
-    gap: 7rem;
+    justify-content: flex-start;
+    gap: 4rem;
     min-height: 0;
     padding-top: 1.2rem;
 }

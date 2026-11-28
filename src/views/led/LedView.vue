@@ -3,8 +3,11 @@
 //
 // Drives the machine's LEDs exclusively through axis-api, exactly like a game
 // would (axis-api -> led:set IPC -> launcher LedManager -> serial -> V6-LED
-// firmware), and mirrors everything on a 3D model of the machine
-// (machine.js). Everything starts off.
+// firmware), and mirrors everything on the 3D machine behind every page
+// (src/scene/: the 'led' stage brings the camera to the rest view with the
+// green atmosphere, then hands it to the mouse / W focus / joystick orbit).
+// Button presses and stick tilts are mirrored by the stage itself.
+// Everything starts off.
 //
 //   - Button echo: a held button moves in on the 3D machine and its LED
 //     lights white, on screen and on the machine.
@@ -19,12 +22,16 @@
 //
 // Without the machine: keyboard and gamepad 0 (src/axis/axis.js).
 
-import { reactive, ref, onMounted, onBeforeUnmount } from 'vue';
+import { reactive, ref, computed, watch, onBeforeUnmount } from 'vue';
 import AppHeader from '../../components/AppHeader.vue';
 import InputIndicators from '../../components/InputIndicators.vue';
 import { Axis, getIpc } from '../../axis/axis.js';
 import { useAxisEvents } from '../../axis/useAxisEvents.js';
-import { MachineScene, STRIP_LENGTH } from './machine.js';
+import { getMachine, loaded, failed } from '../../scene/stage.js';
+
+// LEDs on the 3D strips (machine.js STRIP_LENGTH; kept here so the scene
+// chunk stays lazy).
+const STRIP_LENGTH = 51;
 
 const { on } = useAxisEvents();
 
@@ -80,14 +87,14 @@ const sweeps = {
 
 const panels = reactive({ left: {}, right: {} });
 const sent = ref(0); // LED commands issued
-const loading = ref('Loading the machine…');
-const canvas = ref(null);
+const loading = computed(() => {
+    if (failed.value) return 'Could not load the 3D machine';
+    return loaded.value ? '' : 'Loading the machine…';
+});
 
 // Buttons pressed while this view is shown: a keyup without its keydown is
 // the button that opened the tool being released, not a press here.
 const held = new Set();
-
-let machine = null;
 
 // ---------------------------------------------------------------------------
 // Render (3D strips + the small stats panel)
@@ -95,6 +102,7 @@ let machine = null;
 
 function renderSweep(side) {
     const sweep = sweeps[side];
+    const machine = getMachine();
     // The 3D strip has STRIP_LENGTH LEDs; the axis-api group may differ by a few.
     if (machine) {
         const colors = Array.from({ length: STRIP_LENGTH }, (_, i) => sweep.cells[i] || null);
@@ -150,7 +158,7 @@ function startSweep(side) {
     const sweep = sweeps[side];
     if (sweep.running) return;
     sweep.running = true;
-    if (machine) machine.setFocus(side, true);
+    getMachine()?.setFocus(side, true);
     sweepStep(side);
     sweep.timer = setInterval(() => sweepStep(side), SWEEP_STEP_MS);
     renderSweep(side);
@@ -160,7 +168,7 @@ function pauseSweep(side) {
     const sweep = sweeps[side];
     if (!sweep.running) return;
     sweep.running = false;
-    if (machine) machine.setFocus(side, false);
+    getMachine()?.setFocus(side, false);
     clearInterval(sweep.timer);
     sweep.timer = null;
     renderSweep(side);
@@ -177,7 +185,6 @@ function sweepSideFor(e) {
 
 on(Axis, 'keydown', (e) => {
     held.add(`${e.key}:${e.id}`);
-    if (machine) machine.setButton(e.key, e.id, true);
     setButtonLed(e.key, e.id, ECHO_COLOR);
 
     const side = sweepSideFor(e);
@@ -186,7 +193,6 @@ on(Axis, 'keydown', (e) => {
 
 on(Axis, 'keyup', (e) => {
     if (!held.delete(`${e.key}:${e.id}`)) return;
-    if (machine) machine.setButton(e.key, e.id, false);
     setButtonLed(e.key, e.id, OFF_COLOR);
 
     const side = sweepSideFor(e);
@@ -196,25 +202,21 @@ on(Axis, 'keyup', (e) => {
 // Home also opens the exit overlay (back to the tools); light it while held.
 on(Axis.buttonManager.buttonHome, 'keydown', () => {
     held.add('home:0');
-    if (machine) machine.setHome(true);
     setButtonLed('home', 0, ECHO_COLOR);
 });
 on(Axis.buttonManager.buttonHome, 'keyup', () => {
     if (!held.delete('home:0')) return;
-    if (machine) machine.setHome(false);
     setButtonLed('home', 0, OFF_COLOR);
 });
 
-// Either joystick orbits the camera; per axis, the one pushed furthest wins.
+// Either joystick orbits the camera (the stage tilts the sticks); per axis, the one pushed furthest wins.
 const sticks = { 1: { x: 0, y: 0 }, 2: { x: 0, y: 0 } };
 const furthest = (axis) => (Math.abs(sticks[1][axis]) >= Math.abs(sticks[2][axis]) ? sticks[1][axis] : sticks[2][axis]);
 
 [1, 2].forEach((id) => {
     on(Axis[`joystick${id}`], 'joystick:move', (e) => {
-        if (!machine) return;
-        machine.setJoystick(id, e.position.x, e.position.y);
         sticks[id] = { x: e.position.x, y: e.position.y };
-        machine.setOrbit(furthest('x'), furthest('y'));
+        getMachine()?.setOrbit(furthest('x'), furthest('y'));
     });
 });
 
@@ -233,37 +235,22 @@ on(window, 'beforeunload', shutdown);
 // ---------------------------------------------------------------------------
 
 SIDES.forEach(renderSweep);
+// The scene may still be loading when the view opens.
+watch(loaded, () => SIDES.forEach(renderSweep));
 
-onMounted(() => {
-    machine = new MachineScene(canvas.value);
-
-    // Dev only: poke the scene from the console (window.__machine).
-    if (import.meta.env.DEV) window.__machine = machine;
-
-    machine.load()
-        .then(() => {
-            if (machine.disposed) return;
-            SIDES.forEach(renderSweep);
-            machine.start();
-            loading.value = '';
-        })
-        .catch((error) => {
-            console.error(error);
-            loading.value = 'Could not load the 3D machine';
-        });
-});
-
+// The scene stays: leave its strips dark and its camera free of this page.
 onBeforeUnmount(() => {
     shutdown();
-    if (machine) machine.dispose();
-    if (import.meta.env.DEV && window.__machine === machine) delete window.__machine;
-    machine = null;
+    const machine = getMachine();
+    if (!machine) return;
+    machine.setStrip('left', []);
+    machine.setStrip('right', []);
+    machine.setOrbit(0, 0);
 });
 </script>
 
 <template>
-    <!-- 3D machine, full screen behind the layout (machine.js) -->
-    <canvas ref="canvas" class="scene"></canvas>
+    <!-- The 3D machine is the app's background canvas (App.vue) -->
     <p v-if="loading" class="loading">{{ loading }}</p>
 
     <div class="layout">
@@ -295,16 +282,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* 3D machine behind everything; the layout floats above and lets the
-   mouse through to the orbit controls except where text sits. */
-.scene {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
+/* The layout floats above the 3D machine and lets the mouse through to
+   its orbit controls. */
 .layout {
     pointer-events: none;
 }

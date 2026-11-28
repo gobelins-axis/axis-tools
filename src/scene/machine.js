@@ -1,8 +1,18 @@
-// 3D machine for the LED check, adapted from axis-launcher-front
-// (webgl/components/MachineComponent.js + ButtonManager / JoystickManager):
-// same model, same matcap materials, same press offsets.
+// 3D machine shown behind every page (src/scene/stage.js), adapted from
+// axis-launcher-front (webgl/components/MachineComponent.js + ButtonManager /
+// JoystickManager): same model, same matcap materials, same press offsets.
 //
-// What the page drives:
+// Stages (setStage): each page picks a camera pose and an atmosphere, and the
+// camera eases from one to the next.
+//   'hub'          machine on the right half, neutral (no green), screen off
+//   'calibration'  { joystick: null } both sticks, { joystick: 1 | 2 } that one;
+//                  green atmosphere like the LED check
+//   'screen'       facing the screen, green, screen dark (the dive into the input
+//                  debugger: diveIntoScreen())
+//   'led'          the LED check: rest view, green atmosphere; once there,
+//                  the mouse orbit, W focus and joystick orbit take over
+//
+// What the pages drive:
 //   setButton(key, id, pressed)   button moves in and its LED lights (white)
 //   setHome(pressed)              same for Home
 //   setStrip(side, colors)        side = 'left' | 'right', one CSS colour or
@@ -32,6 +42,7 @@ import {
     PerspectiveCamera,
     PlaneGeometry,
     Scene,
+    Spherical,
     ShaderMaterial,
     TextureLoader,
     Vector2,
@@ -82,11 +93,27 @@ const FLOOR = {
     fadeFar: 28,
 };
 
-// Matrix atmosphere: everything stays dark with a faint green cast. The
-// background and the floor's far fade share BACKGROUND; the machine's matcap
-// shading is multiplied by MACHINE_TINT.
-const BACKGROUND = '#050806';
-const MACHINE_TINT = '#e6ffeb';
+// Atmospheres, blended per stage (0 = neutral, 1 = matrix). Matrix:
+// everything stays dark with a faint green cast. The background and the
+// floor's far fade share `background`; the machine's matcap shading is
+// multiplied by `tint`. Neutral: same values, grey.
+const ATMOSPHERES = {
+    neutral: {
+        background: '#050505',
+        floorA: '#0b0b0b',
+        floorB: '#131313',
+        light: '#0c0c0c',
+        tint: '#f2f2f2',
+    },
+    matrix: {
+        background: '#050806',
+        floorA: FLOOR.colorA,
+        floorB: FLOOR.colorB,
+        light: FLOOR.lightColor,
+        tint: '#e6ffeb',
+    },
+};
+const BACKGROUND = ATMOSPHERES.matrix.background;
 
 // The machine faces +x. Rest view: from the front, slightly above and to the
 // right. The strips sit on the front corners of the lower body and face
@@ -101,6 +128,45 @@ const FOCUS_EASE = 4;
 // above the floor limit (maxPolarAngle) from the rest view.
 const PITCH_UP = MathUtils.degToRad(12);
 const PITCH_DOWN = MathUtils.degToRad(5);
+
+// Stage camera moves: fraction of the remaining way covered per second.
+const STAGE_EASE = 2.6;
+const ATMOSPHERE_EASE = 2;
+// Hub: rest direction, this much further than the rest view, machine on
+// the right half of the screen (the menu's column is on the left).
+const HUB = { distance: 1.3, shiftX: 0.21 };
+// Screen power on / off, fraction of the remaining way per second.
+const SCREEN_EASE = 5;
+
+// Dive into the screen (diveIntoScreen), ms from the start. The camera
+// swings to face the screen (stage ease) with the screen dark (no rain), the
+// screen fades to white, then the camera dives in, accelerating, until the
+// white screen fills the view.
+const DIVE = {
+    lightAt: 1100,
+    lightMs: 350,
+    diveAt: 1500,
+    diveMs: 900,
+    whiteBefore: 350, // onWhite() this long before the end (page cover)
+    frame: 0.42, // screen height / view height while facing it
+};
+// Calibration, from the front and above (+x is the front, +z the left
+// side). Distances are fractions of the machine's bounding radius.
+// shiftX / shiftY move the target on screen (fractions of the viewport,
+// + = right / down) so it clears the page's text and pads.
+// The shots aim at the ball of each stick (STICK_HEIGHT above its pivot).
+// Content is on the left: the sticks sit in the middle of the right half.
+// lookY raises (+) or lowers (-) the aimed point, lookX moves it sideways
+// (+ = towards the machine's right side, screen right from the front), in
+// model units.
+const CALIBRATION = {
+    // Low, slightly from the right: seen from above, the plexiglass panel
+    // catches the matcap's highlight and turns bright.
+    both: { direction: new Vector3(0.974, 0.18, -0.225), distance: 4.75, lookX: 0.34, lookY: 0, shiftX: 0.24, shiftY: 0 },
+    1: { direction: new Vector3(0.857, 0.57, 0.515), distance: 2.4, lookX: 0.11, lookY: -0.09, shiftX: 0.24, shiftY: 0 },
+    2: { direction: new Vector3(0.695, 0.57, -0.719), distance: 2.4, lookX: 0.11, lookY: -0.1, shiftX: 0.24, shiftY: 0 },
+};
+const STICK_HEIGHT = 0.22;
 
 const BUTTON_MESHES = {
     'a:1': 'bouton_A_gauche',
@@ -162,7 +228,7 @@ const matcapFragment = /* glsl */ `
     }
 `;
 
-function matcapMaterial(matcap, { color = '#ffffff', map = null } = {}) {
+function matcapMaterial(matcap, tint, { color = '#ffffff', map = null } = {}) {
     return new ShaderMaterial({
         vertexShader: matcapVertex,
         fragmentShader: matcapFragment,
@@ -170,7 +236,7 @@ function matcapMaterial(matcap, { color = '#ffffff', map = null } = {}) {
             matcap: { value: matcap },
             map: { value: map },
             color: { value: new Color(color) },
-            tint: { value: new Color(MACHINE_TINT) },
+            tint: { value: tint }, // shared: follows the atmosphere
             useMap: { value: Boolean(map) },
         },
         side: DoubleSide,
@@ -283,6 +349,30 @@ function drawStrip(strip, colors, flip) {
 const _offset = new Vector3();
 const _up = new Vector3(0, 1, 0);
 const _axis = new Vector3();
+const _spherical = new Spherical();
+
+function createPose() {
+    return { target: new Vector3(), radius: 1, theta: 0, phi: Math.PI / 2, shiftX: 0, shiftY: 0 };
+}
+
+function copyPose(to, from) {
+    to.target.copy(from.target);
+    to.radius = from.radius;
+    to.theta = from.theta;
+    to.phi = from.phi;
+    to.shiftX = from.shiftX;
+    to.shiftY = from.shiftY;
+}
+
+// Shortest signed angle from a to b.
+function angleTo(a, b) {
+    return MathUtils.euclideanModulo(b - a + Math.PI, Math.PI * 2) - Math.PI;
+}
+
+function blend(palette, t) {
+    const { neutral, matrix } = ATMOSPHERES;
+    return new Color(neutral[palette]).lerp(new Color(matrix[palette]), t);
+}
 
 export class MachineScene {
     constructor(canvas) {
@@ -301,6 +391,8 @@ export class MachineScene {
         this.controls.enableZoom = true;
         // Stay above the floor.
         this.controls.maxPolarAngle = MathUtils.degToRad(84);
+        // Only in the LED check, once the camera got there (see _tick).
+        this.controls.enabled = false;
 
         // Glows: materials flagged userData.bloom (strips and buttons).
         this.bloom = new SelectiveBloom({ renderer: this.renderer, scene: this.scene, camera: this.camera });
@@ -315,6 +407,20 @@ export class MachineScene {
         this.screen = new MatrixScreen();
 
         this.focus = { yaw: 0, target: 0, stick: 0, pitch: 0, pitchTarget: 0, stickPitch: 0, sides: new Set(), returnTimer: null, lastTime: 0 };
+
+        // Stage camera: `pose` eases towards `goal`. In the LED check, once
+        // arrived, OrbitControls own the camera (`free`) until the next stage.
+        this.stage = { name: 'hub', joystick: null };
+        this.pose = createPose();
+        this.goal = createPose();
+        this.free = false;
+        this.tint = new Color(ATMOSPHERES.neutral.tint);
+        this.atmosphere = { value: 0, target: 0 };
+        this.screenPower = { value: 0, target: 0 };
+        this.screenLight = { value: 0, target: 0 };
+        this.dive = null;
+        this.width = 1;
+        this.height = 1;
 
         this._resize = this._resize.bind(this);
         this._tick = this._tick.bind(this);
@@ -338,13 +444,13 @@ export class MachineScene {
 
         // Same assignment as the front's MachineComponent.
         const materials = {
-            borne: matcapMaterial(mirror2, { color: '#414141' }),
-            plexiglass: matcapMaterial(mirror1, { color: '#7e7e7e' }),
-            grille: matcapMaterial(mirror1, { map: ventilation }),
-            bases: matcapMaterial(clearSoft, { color: '#151515' }),
-            écran: matcapMaterial(mirror1, { color: '#151515' }),
-            joystickBall: matcapMaterial(mirror2, { color: '#313131' }),
-            joystickStick: matcapMaterial(mirror1, { color: '#ffffff' }),
+            borne: matcapMaterial(mirror2, this.tint, { color: '#414141' }),
+            plexiglass: matcapMaterial(mirror1, this.tint, { color: '#7e7e7e' }),
+            grille: matcapMaterial(mirror1, this.tint, { map: ventilation }),
+            bases: matcapMaterial(clearSoft, this.tint, { color: '#151515' }),
+            écran: matcapMaterial(mirror1, this.tint, { color: '#151515' }),
+            joystickBall: matcapMaterial(mirror2, this.tint, { color: '#313131' }),
+            joystickStick: matcapMaterial(mirror1, this.tint, { color: '#ffffff' }),
         };
 
         const model = gltf.scene;
@@ -385,6 +491,8 @@ export class MachineScene {
                 // Its face points away from the viewer: double-sided.
                 child.material = new MeshBasicMaterial({ map: this.screen.texture, side: DoubleSide });
                 child.material.userData.bloom = true;
+                this.screenMaterial = child.material; // colour = power (black = off)
+                this.screenMesh = child;
                 return;
             }
 
@@ -412,6 +520,15 @@ export class MachineScene {
         this.setStrip('left', []);
         this.setStrip('right', []);
         this._frame();
+        this._measureScreen();
+
+        // First stage: no move, start there.
+        this.setStage(this.stage.name, this.stage);
+        copyPose(this.pose, this.goal);
+        this.atmosphere.value = this.atmosphere.target;
+        this._applyAtmosphere();
+        this.screenPower.value = this.screenPower.target;
+        this._applyScreenPower();
     }
 
     // Frees everything (the LED check is a route now: leaving it must not
@@ -442,10 +559,177 @@ export class MachineScene {
     }
 
     start() {
-        if (this.disposed) return;
+        if (this.disposed || this.started) return;
+        this.started = true;
         window.addEventListener('resize', this._resize);
         this._resize();
         this.renderer.setAnimationLoop(this._tick);
+    }
+
+    // Stops rendering while the scene is hidden (input debugger).
+    setPaused(paused) {
+        if (!this.started || this.disposed) return;
+        this.renderer.setAnimationLoop(paused ? null : this._tick);
+        this.focus.lastTime = 0;
+    }
+
+    // Camera pose and atmosphere for a page; see the top of the file. Can be
+    // called before load() (kept, applied once loaded).
+    setStage(name, { joystick = null } = {}) {
+        const leavingLed = this.stage.name === 'led' && name !== 'led';
+        this.stage = { name, joystick };
+        this.atmosphere.target = name === 'hub' ? 0 : 1;
+        this.screenPower.target = name === 'hub' ? 0 : 1;
+        if (name !== 'screen') {
+            this.screenLight.target = 0;
+            if (this.dive) {
+                this.dive.resolve(false);
+                this.dive = null;
+            }
+        }
+        if (!this.model) return;
+
+        if (leavingLed || name === 'led') this._takeCamera();
+        if (name === 'led') this._resetFocus();
+
+        const { goal, center, restDistance, radius } = this;
+        goal.shiftX = 0;
+        goal.shiftY = 0;
+        let direction = VIEW_DIRECTION;
+        let distance = restDistance;
+        goal.target.copy(center);
+
+        if (name === 'hub') {
+            distance = restDistance * HUB.distance;
+            goal.shiftX = HUB.shiftX;
+        } else if (name === 'screen' && this.screenInfo) {
+            goal.target.copy(this.screenInfo.center);
+            direction = this.screenInfo.normal;
+            distance = this.screenInfo.height / (this._viewHeightPerUnit() * DIVE.frame);
+        } else if (name === 'calibration') {
+            const shot = CALIBRATION[joystick] || CALIBRATION.both;
+            const sticks = Object.values(this.joysticks).map((j) => j.mesh.getWorldPosition(new Vector3()));
+            if (CALIBRATION[joystick] && this.joysticks[joystick]) {
+                this.joysticks[joystick].mesh.getWorldPosition(goal.target);
+            } else if (sticks.length) {
+                goal.target.set(0, 0, 0);
+                sticks.forEach((p) => goal.target.add(p));
+                goal.target.divideScalar(sticks.length);
+                // Each stick sits left of its buttons: the panel's middle
+                // is the machine's.
+                goal.target.z = center.z;
+            }
+            goal.target.y += STICK_HEIGHT + (shot.lookY || 0);
+            goal.target.z -= shot.lookX || 0; // the machine's right side is z-
+            direction = shot.direction;
+            distance = radius * shot.distance;
+            goal.shiftX = shot.shiftX;
+            goal.shiftY = shot.shiftY;
+        }
+
+        _spherical.setFromVector3(_offset.copy(direction).normalize());
+        goal.radius = distance;
+        goal.phi = _spherical.phi;
+        goal.theta = _spherical.theta;
+    }
+
+    // The input debugger's entrance: faces the screen (dark), fades it to
+    // white, dives in. onWhite() fires when the screen is about to fill
+    // the view (cover the page then); resolves true at the end, false if
+    // another stage interrupted it.
+    diveIntoScreen({ onWhite = () => {} } = {}) {
+        if (this.dive) this.dive.resolve(false);
+        this.setStage('screen');
+        return new Promise((resolve) => {
+            this.dive = { start: null, fromRadius: null, white: false, resolve, onWhite };
+        });
+    }
+
+    _viewHeightPerUnit() {
+        return 2 * Math.tan(MathUtils.degToRad(FOV / 2));
+    }
+
+    // Screen quad: centre, outward normal (towards the front, +x) and size.
+    _measureScreen() {
+        const mesh = this.screenMesh;
+        if (!mesh) return;
+        this.model.updateMatrixWorld(true);
+        const geometry = mesh.geometry;
+        geometry.computeBoundingBox();
+        const box = geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld);
+        const size = box.getSize(new Vector3());
+        const normal = new Vector3(1, 0, 0);
+        const normals = geometry.attributes.normal;
+        if (normals) {
+            normal.fromBufferAttribute(normals, 0).transformDirection(mesh.matrixWorld);
+            if (normal.x < 0) normal.negate(); // the quad faces away
+        }
+        this.screenInfo = {
+            center: box.getCenter(new Vector3()),
+            normal,
+            width: size.z,
+            height: Math.hypot(size.x, size.y),
+        };
+    }
+
+    // Runs the dive's timeline (see DIVE); called every frame while diving.
+    _updateDive(time) {
+        const dive = this.dive;
+        if (dive.start === null) dive.start = time;
+        const t = time - dive.start;
+        const { screen } = this;
+
+        screen.blank = true;
+        screen.light = MathUtils.smoothstep(t, DIVE.lightAt, DIVE.lightAt + DIVE.lightMs);
+        this.screenLight.value = screen.light;
+
+        if (t >= DIVE.diveAt) {
+            const info = this.screenInfo;
+            if (dive.fromRadius === null) dive.fromRadius = this.pose.radius;
+            // Close enough that the screen covers the whole view.
+            const perUnit = this._viewHeightPerUnit();
+            const end = info
+                ? Math.max(0.15, Math.min(info.height * 0.8 / perUnit, info.width * 0.8 / (perUnit * this.camera.aspect)))
+                : this.pose.radius * 0.1;
+            const k = Math.min(1, (t - DIVE.diveAt) / DIVE.diveMs);
+            dive.radius = MathUtils.lerp(dive.fromRadius, end, k * k * k); // ease in: accelerates
+        }
+
+        if (!dive.white && t >= DIVE.diveAt + DIVE.diveMs - DIVE.whiteBefore) {
+            dive.white = true;
+            dive.onWhite();
+        }
+        if (t >= DIVE.diveAt + DIVE.diveMs) {
+            this.dive = null;
+            this.screenLight.value = 1;
+            dive.resolve(true);
+        }
+    }
+
+    // Back to the stage rig from wherever the camera is (the mouse orbit and
+    // the W / joystick focus may have moved it).
+    _takeCamera() {
+        if (!this.free) return;
+        this.free = false;
+        this.controls.enabled = false;
+        this.pose.target.copy(this.controls.target);
+        _spherical.setFromVector3(_offset.copy(this.camera.position).sub(this.controls.target));
+        this.pose.radius = _spherical.radius;
+        this.pose.phi = _spherical.phi;
+        this.pose.theta = _spherical.theta;
+        this.pose.shiftX = 0;
+        this.pose.shiftY = 0;
+    }
+
+    // The LED check starts from the rest view; held sticks and sweeps from
+    // a previous visit are forgotten.
+    _resetFocus() {
+        const { focus } = this;
+        clearTimeout(focus.returnTimer);
+        focus.returnTimer = null;
+        focus.sides.clear();
+        focus.yaw = focus.target = focus.stick = 0;
+        focus.pitch = focus.pitchTarget = focus.stickPitch = 0;
     }
 
     setButton(key, id, pressed) {
@@ -551,11 +835,13 @@ export class MachineScene {
         const radius = box.getSize(new Vector3()).length() / 2;
         const distance = radius / Math.sin(((FOV / 2) * Math.PI) / 180) * 1.12;
 
+        this.center = center;
+        this.radius = radius;
+        this.restDistance = distance;
         this.controls.target.copy(center);
         this.camera.position.copy(center).addScaledVector(VIEW_DIRECTION, distance);
         this.controls.minDistance = distance * 0.4;
         this.controls.maxDistance = distance * 1.6;
-        this.controls.update();
     }
 
     _resize() {
@@ -565,12 +851,115 @@ export class MachineScene {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height, false);
         this.bloom.setSize(width, height);
+        this.width = width;
+        this.height = height;
+    }
+
+    // Eases the stage camera; hands it to OrbitControls once the LED check
+    // view is reached.
+    _moveCamera(delta) {
+        const { pose, goal, camera } = this;
+        const ease = 1 - Math.exp(-STAGE_EASE * delta);
+        pose.target.lerp(goal.target, ease);
+        pose.radius += (goal.radius - pose.radius) * ease;
+        if (this.dive && this.dive.radius !== undefined) pose.radius = this.dive.radius;
+        pose.phi += (goal.phi - pose.phi) * ease;
+        pose.theta += angleTo(pose.theta, goal.theta) * ease;
+        pose.shiftX += (goal.shiftX - pose.shiftX) * ease;
+        pose.shiftY += (goal.shiftY - pose.shiftY) * ease;
+
+        _spherical.set(pose.radius, pose.phi, pose.theta);
+        camera.position.setFromSpherical(_spherical).add(pose.target);
+        camera.lookAt(pose.target);
+
+        const arrived = this.stage.name === 'led'
+            && pose.target.distanceTo(goal.target) < this.radius * 0.002
+            && Math.abs(goal.radius - pose.radius) < this.radius * 0.002
+            && Math.abs(goal.phi - pose.phi) < 0.002
+            && Math.abs(angleTo(pose.theta, goal.theta)) < 0.002
+            && Math.abs(pose.shiftX) < 0.001 && Math.abs(pose.shiftY) < 0.001;
+        if (arrived) {
+            this.free = true;
+            this.controls.target.copy(pose.target);
+            this.controls.enabled = true;
+            this.controls.update();
+        }
+    }
+
+    // Moves the rendered image so the pose target sits off centre.
+    _applyShift() {
+        const { pose, camera, width, height } = this;
+        const x = this.free ? 0 : pose.shiftX;
+        const y = this.free ? 0 : pose.shiftY;
+        if (Math.abs(x) < 1e-4 && Math.abs(y) < 1e-4) {
+            if (camera.view && camera.view.enabled) camera.clearViewOffset();
+            return;
+        }
+        camera.setViewOffset(width, height, -x * width, -y * height, width, height);
+    }
+
+    _applyScreenPower() {
+        if (this.screenMaterial) this.screenMaterial.color.setScalar(this.screenPower.value);
+    }
+
+    _applyAtmosphere() {
+        const t = this.atmosphere.value;
+        const background = blend('background', t);
+        this.renderer.setClearColor(background);
+        this.tint.copy(blend('tint', t));
+        if (this.floor) {
+            const u = this.floor.material.uniforms;
+            u.uFogColor.value.copy(background);
+            u.uColorA.value.copy(blend('floorA', t));
+            u.uColorB.value.copy(blend('floorB', t));
+            u.uLightColor.value.copy(blend('light', t));
+        }
     }
 
     _tick(time) {
         const { focus } = this;
         const delta = Math.min(0.1, (time - (focus.lastTime || time)) / 1000);
         focus.lastTime = time;
+
+        const atmosphere = this.atmosphere;
+        if (atmosphere.value !== atmosphere.target) {
+            atmosphere.value += (atmosphere.target - atmosphere.value) * (1 - Math.exp(-ATMOSPHERE_EASE * delta));
+            if (Math.abs(atmosphere.target - atmosphere.value) < 0.002) atmosphere.value = atmosphere.target;
+            this._applyAtmosphere();
+        }
+
+        const power = this.screenPower;
+        if (power.value !== power.target) {
+            power.value += (power.target - power.value) * (1 - Math.exp(-SCREEN_EASE * delta));
+            if (Math.abs(power.target - power.value) < 0.002) power.value = power.target;
+            this._applyScreenPower();
+        }
+
+        if (this.dive) this._updateDive(time);
+        else {
+            const light = this.screenLight;
+            if (light.value !== light.target) {
+                light.value += (light.target - light.value) * (1 - Math.exp(-SCREEN_EASE * delta));
+                if (Math.abs(light.target - light.value) < 0.002) light.value = light.target;
+            }
+            this.screen.light = light.value;
+            // Dark under the white until it has faded (back on the hub).
+            this.screen.blank = this.stage.name === 'screen' || light.value > 0;
+        }
+
+        if (!this.free) this._moveCamera(delta);
+        if (this.free) this._focusCamera(delta);
+        this._applyShift();
+
+        if (power.value > 0) this.screen.update(time);
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.scene, this.camera);
+        this.bloom.render();
+    }
+
+    // LED check: W focus and joystick orbit, by steps so a mouse orbit is kept.
+    _focusCamera(delta) {
+        const { focus } = this;
         const ease = 1 - Math.exp(-FOCUS_EASE * delta);
         const previousYaw = focus.yaw;
         const previousPitch = focus.pitch;
@@ -587,11 +976,6 @@ export class MachineScene {
             if (pitchStep) _offset.applyAxisAngle(_axis.crossVectors(_offset, _up).normalize(), pitchStep);
             this.camera.position.copy(this.controls.target).add(_offset);
         }
-
-        this.screen.update(time);
         this.controls.update();
-        this.renderer.setRenderTarget(null);
-        this.renderer.render(this.scene, this.camera);
-        this.bloom.render();
     }
 }

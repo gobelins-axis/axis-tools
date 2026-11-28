@@ -5,6 +5,8 @@
 // meta.theme   'cabinet' (design system, src/styles/base.css) or 'dev'
 //              (the input debugger's light look), set on <html data-theme>
 // meta.title   document title
+// meta.stage   3D background stage (src/scene/stage.js): 'hub' | 'calibration'
+//              | 'led' | 'hidden'
 
 import { createRouter, createWebHistory } from 'vue-router';
 import HubView from './views/HubView.vue';
@@ -19,16 +21,17 @@ const VIEWS = {
 };
 
 const THEMES = { inputs: 'dev' };
+const STAGES = { calibration: 'calibration', led: 'led', inputs: 'hidden' };
 
 export const router = createRouter({
     history: createWebHistory(),
     routes: [
-        { path: '/', name: 'hub', component: HubView, meta: { theme: 'cabinet', title: 'Axis Tools' } },
+        { path: '/', name: 'hub', component: HubView, meta: { theme: 'cabinet', title: 'Axis Tools', stage: 'hub' } },
         ...TOOLS.map((tool) => ({
             path: `/tools/${tool.id}/`,
             name: tool.id,
             component: VIEWS[tool.id],
-            meta: { tool: tool.id, theme: THEMES[tool.id] || 'cabinet', title: `${tool.name} · Axis Tools` },
+            meta: { tool: tool.id, theme: THEMES[tool.id] || 'cabinet', title: `${tool.name} · Axis Tools`, stage: STAGES[tool.id] || 'hub' },
         })),
         { path: '/:pathMatch(.*)*', redirect: '/' },
     ],

@@ -14,11 +14,12 @@ hub page) opens each tool. See `../CLAUDE.md` for the ecosystem and the IPC cont
 
 - `index.html`: the only page. Keeps the `window.__axis__` shim in `<head>` (the launcher
   preload checks for it at DOMContentLoaded and may run before the app).
-- `src/main.js` → `setupAxis({ router })`, then mounts `App.vue` (a `<RouterView>` keyed by
-  path, so every tool mounts fresh).
+- `src/main.js` → `setupAxis({ router })`, then mounts `App.vue`: the 3D background canvas
+  (see below) and a `<RouterView>` keyed by path, so every tool mounts fresh.
 - `src/router.js`: `/` = hub, `/tools/<id>/` = each tool (same URLs as the old multi-page
   site), unknown paths → `/`. Route meta: `tool` (id), `theme` (`cabinet` | `dev`, set on
-  `<html data-theme>`), `title`. Tool views are lazy chunks (three.js only loads with the LED check).
+  `<html data-theme>`), `title`, `stage` (3D background, see below). Tool views are lazy chunks; three.js loads in
+  its own chunk after the first page shows.
 - `src/tools.js`: list of tools (id, name, description). Adding a tool = view under
   `src/views/<id>/` + entry here + entry in `VIEWS` in `router.js`.
 - `src/axis/axis.js`: the one axis-api setup, run once:
@@ -58,8 +59,8 @@ Switching tools was a full page load in the multi-page version; route changes ar
   `led:clear` on every route change, `LedView` stops its sweeps and clears on unmount.
 - **axis-api config**: the input debugger writes joystick `deadzone` / `threshold`; it
   restores the previous values on unmount.
-- **Resources**: `MachineScene.dispose()` frees the WebGL context; frame loops, timers
-  and intervals are cleared on unmount.
+- **Resources**: the 3D scene is created once and kept (never disposed); `LedView` clears
+  its strips and orbit on unmount. Frame loops, timers and intervals are cleared on unmount.
 - Reactive objects cannot go through Electron IPC (structured clone): send plain data
   (`calibration.js` copies every payload).
 
@@ -77,7 +78,38 @@ The launcher has no tool pages anymore: this site is the only way to reach the t
 `src/views/calibration/calibration.js`, ported line for line from the pre-Vue page and
 checked against it with a scripted run (same screen texts and IPC payloads at every step).
 
-## LED check 3D scene (`src/views/led/machine.js`)
+## 3D background (`src/scene/`)
+
+One `MachineScene` (`machine.js`) behind every page, created by `App.vue` through
+`stage.js` and kept for the app's lifetime. Each route's `meta.stage` picks a stage and the
+camera eases to it (`setStage`, `STAGE_EASE`), along with the atmosphere (`ATMOSPHERES`,
+neutral ↔ matrix green) and a CSS brightness on the canvas (`App.vue`):
+
+- `hub` (hub, alternative controllers): rest direction, a bit further (`HUB`), machine on
+  the right half (the menu is a left column), neutral, screen off, brightness 0.45;
+- `calibration`: `CALIBRATION` shots, on the right half (the views are a left column).
+  The whole panel on the overview and once done, otherwise the joystick being calibrated
+  seen from its side; all low (the panel turns bright from above). Shots were tuned by eye
+  (direction, distance, `lookX` / `lookY` aim offsets). Green
+  atmosphere. `CalibrationView` picks the shot; moving a stick only tilts it.
+  Brightness 0.6;
+- `led`: rest view, centred, green, full brightness. Once the camera arrives, OrbitControls take
+  over (`free`) with the W focus / joystick orbit; leaving reads the camera back into the
+  rig. Only this stage takes the mouse;
+- `screen`: facing the screen, green. Only used by the input debugger's entrance: the hub
+  calls `diveIntoScreen()` (stage.js → machine.js, timeline in `DIVE`): the hub UI fades
+  out, the camera faces the screen (dark, no rain: `matrixScreen.js` `blank`), the screen
+  fades to white (`light`; white crosses the bloom threshold, so it glows), then the
+  camera dives in. `whiteout` (App.vue) covers the
+  page in the debugger's `#f4f4f4`, the router navigates, the cover fades out. Skipped
+  with reduced motion or before the scene has loaded;
+- `hidden` (input debugger): canvas hidden, rendering paused. Back on the hub the camera
+  pulls out of the screen.
+
+`stage.js` mirrors buttons (press + light) and stick tilt on every page; views reach the
+scene with `getMachine()` (null until loaded). In dev, `window.__machine` exposes it.
+
+### Scene details
 
 three.js (pinned `0.170.0`) scene of the machine, model and matcaps copied from
 `axis-launcher-front/static/webgl` (`axis-machine-v7.glb` → `public/models/axis-machine.glb`).
@@ -90,12 +122,12 @@ its material has `userData.bloom = true` (strips and buttons). The machine stand
 procedural checker floor (`FLOOR` in machine.js) that fades to black like fog; tiles are
 sized from the `borne` mesh's outline at floor level so the base covers exactly 2 x 2.
 The screen (`écran`, a double-sided quad) shows a digital-rain canvas texture
-(`matrixScreen.js`) that also glows. Matrix atmosphere: `BACKGROUND` (clear colour and floor fog), a green
-light pool on the floor (`FLOOR.lightColor`) and a faint `MACHINE_TINT` on the matcaps. The
+(`matrixScreen.js`) that also glows. Matrix atmosphere (`ATMOSPHERES.matrix`): background (clear colour and floor fog), a green
+light pool on the floor (`FLOOR.lightColor`) and a faint tint on the matcaps. The
 machine faces +x; the strips (`LED_gauche` z+, `LED_droite` z−) sit on the front corners
 of the lower body facing sideways, so `setFocus` orbits the camera towards the side
 being swept. Joysticks also orbit the camera (`setOrbit`: full left shows the right
 side, up/down rise 12° / dip 5° (`PITCH_UP/DOWN`), centred = rest view); a held W sweep wins, then hands back after `FOCUS_RETURN_DELAY_MS`.
 Test without the machine with the app-wide gamepad emulation (see Layout). `STRIP_FLIP` picks which end of each strip mesh is LED 0. Mouse orbit is on
-(OrbitControls). `dispose()` frees everything when the route is left. In dev, `window.__machine` exposes the scene.
+(OrbitControls, LED stage only).
 
