@@ -96,9 +96,11 @@ const inputs = computed(() => {
 // Events
 // ---------------------------------------------------------------------------
 
-// While the exit overlay shows, A / X are its Yes / Back: without this guard
+// Home in a tool goes straight to the hub (src/axis/axis.js), so the exit
+// overlay normally never shows here. If it ever does (axis-api internals
+// changed, see routeHome), A / X are its Yes / Back: without this guard
 // quitting with Home + A would save the preview and cancelling with X would
-// restart the joystick (the pre-Vue page had that bug).
+// restart the joystick.
 on(Axis, 'keydown', (e) => {
     if (exitOverlay.isOpen()) return;
     calibration.onKeydown(e);

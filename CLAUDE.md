@@ -23,9 +23,14 @@ hub page) opens each tool. See `../CLAUDE.md` for the ecosystem and the IPC cont
   `src/views/<id>/` + entry here + entry in `VIEWS` in `router.js`.
 - `src/axis/axis.js`: the one axis-api setup, run once:
   - keeps the raw `ipcRenderer` (`onIpc(fn)`, `getIpc()`) for launcher-specific channels;
-  - exit gate: wraps the ipcRenderer handed to axis-api so its `exit` message is dropped
-    while the current route is a tool, and goes to the hub (`?from=<id>`) on
-    `exit:completed`. Home in a tool = back to the hub; on the hub `exit` reaches the launcher;
+  - Home (Escape on a keyboard): inside a tool, straight back to the hub (`?from=<id>`),
+    no exit overlay; on the hub, axis-api's exit overlay as in any game (confirm =
+    launcher menu). axis-api's ExitOverlay has no public switch: `routeHome()` swaps its
+    two private listeners for one that routes, and resets its `_active` flag after a
+    confirm (axis-api never does, a game reloads there; left alone, the next Home on the
+    hub would quit without the overlay);
+  - exit gate (safety net): the ipcRenderer handed to axis-api drops `exit` while the
+    current route is a tool;
   - keyboard emulation (Q D Z S Space / ← → ↑ ↓ Enter, Escape = Home) and **one** gamepad
     emulator for the whole app (axis-api accepts a single emulator per joystick / button):
     sticks = joysticks, buttons 0–3 / 4–7 = A X I S of groups 1 / 2, d-pad ← → = W1 / W2.
@@ -38,9 +43,9 @@ hub page) opens each tool. See `../CLAUDE.md` for the ecosystem and the IPC cont
   `:where()`, so it never reaches the input debugger and view `<style scoped>` rules
   override it. `src/components/`: `AppHeader`, `InputIndicators` (bottom-right glyphs,
   same fade as the front). Fonts and icons in `public/`.
-- While axis-api's exit overlay is open, its Yes / Back (A / X) still arrive as ordinary
-  `keydown` events: views that act on A / X check `useExitOverlay().isOpen()` (hub,
-  calibration).
+- While axis-api's exit overlay is open (hub only), its Yes / Back (A / X) still arrive as
+  ordinary `keydown` events: views that act on A / X check `useExitOverlay().isOpen()` (hub,
+  and calibration as a fallback).
 
 ### What page loads used to do (keep this in mind when changing a view)
 

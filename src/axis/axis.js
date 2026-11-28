@@ -41,16 +41,16 @@ export function setupAxis(options) {
         delete window.__axis_pending_ipc__;
     }
 
-    // Dispatched by axis-api right before it sends `exit`. Inside a tool the
-    // gate drops that `exit` (the route is still the tool: navigation is
-    // async) and we go back to the hub, reselecting the tool. On the hub
-    // nothing happens here and the launcher gets `exit`. In a browser there
-    // is no IPC at all.
+    // Dispatched by axis-api right before it sends `exit`. Only reachable on
+    // the hub now (see routeHome), but kept as a safety net: inside a tool
+    // the gate drops that `exit` (the route is still the tool: navigation is
+    // async) and we go back to the hub. In a browser there is no IPC at all.
     Axis.addEventListener('exit:completed', () => {
         const tool = currentTool();
         if (tool) router.push({ name: 'hub', query: { from: tool } });
     });
 
+    routeHome();
     registerKeyboard();
     registerGamepad();
 
@@ -74,6 +74,44 @@ export function isMachine() {
 /** Tool id of the current route, or null on the hub. */
 function currentTool() {
     return (router && router.currentRoute.value.meta.tool) || null;
+}
+
+// Home (Escape on a keyboard):
+//   - inside a tool: straight back to the hub, reselecting the tool. No exit
+//     overlay, no `exit` IPC;
+//   - on the hub: axis-api's exit overlay, as in any game (confirm = back to
+//     the launcher menu).
+//
+// axis-api's ExitOverlay listens to Home itself and has no public switch, so
+// its two listeners (buttonManager `home:keyup`, window `keydown` Escape)
+// are swapped for one that routes. It also never resets its state after a
+// confirm (a game reloads at that point, this app does not): left as is,
+// the next Home would skip the overlay and quit at once. Both rely on
+// private fields of the pinned build; if they ever disappear, the stock
+// behaviour stays (overlay everywhere, exit gate above).
+function routeHome() {
+    const overlay = Axis._exitOverlay;
+    if (!overlay || typeof overlay._homeKeyupHandler !== 'function' || typeof overlay._keydownHandler !== 'function') {
+        console.warn('[axis-tools] axis-api ExitOverlay internals changed: Home shows the exit overlay in tools too');
+        return;
+    }
+
+    Axis.buttonManager.removeEventListener('home:keyup', overlay._homeKeyupHandler);
+    window.removeEventListener('keydown', overlay._keydownHandler);
+
+    function home() {
+        const tool = currentTool();
+        if (tool) router.push({ name: 'hub', query: { from: tool } });
+        else overlay._homeKeyupHandler();
+    }
+
+    Axis.buttonManager.addEventListener('home:keyup', home);
+    window.addEventListener('keydown', (e) => {
+        // A held Escape must not reopen the overlay once back on the hub.
+        if (e.key === 'Escape' && !e.repeat) home();
+    });
+
+    overlay.addEventListener('exit:completed', () => { overlay._active = false; });
 }
 
 // Same ipcRenderer, minus the `exit` message while a tool is shown: the
