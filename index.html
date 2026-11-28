@@ -1,38 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="cabinet">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Axis Tools</title>
     <script>
         // The launcher preload looks for window.__axis__ at DOMContentLoaded. The
-        // real object is created when the module below runs; this shim keeps the
-        // ipcRenderer if the preload gets there first (see src/shared/axis.js).
+        // real object is created when axis-api loads; this shim keeps the
+        // ipcRenderer if the preload gets there first (see src/axis/axis.js).
         window.__axis__ = {
             set_ipc_renderer: function (ipcRenderer) { window.__axis_pending_ipc__ = ipcRenderer; },
         };
     </script>
 </head>
 <body>
-    <div class="layout">
-        <header class="header">
-            <img class="logo" src="/icons/logo.svg" alt="Axis">
-        </header>
-
-        <main class="view view--hub">
-            <div class="heading">
-                <h1 class="title">Debug Tools</h1>
-                <p class="description">Calibration and debugging for the machine.</p>
-            </div>
-
-            <ol class="tools js-tools"></ol>
-        </main>
-
-        <footer class="inputs">
-            <div class="inputs-container js-inputs"></div>
-        </footer>
-    </div>
-
-    <script type="module" src="/src/hub/hub.js"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>

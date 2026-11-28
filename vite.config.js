@@ -1,27 +1,16 @@
-import { resolve } from 'path';
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
-// Multi-page site: the hub at / and one page per tool under /tools/<id>/.
-// Each tool is its own page on purpose: switching tools is a full page load,
-// so axis-api, IPC listeners and LED state start clean every time (the
-// launcher also clears the LEDs on every load).
-const pages = {
-    hub: 'index.html',
-    calibration: 'tools/calibration/index.html',
-    inputs: 'tools/inputs/index.html',
-    led: 'tools/led/index.html',
-    alternative: 'tools/alternative/index.html',
-};
-
+// Single-page Vue app: the hub at / and one route per tool under
+// /tools/<id>/ (src/router.js). Netlify rewrites every path to index.html
+// (netlify.toml); `vite` and `vite preview` do the same out of the box.
 export default defineConfig({
+    plugins: [vue()],
     server: {
         port: 8090,
     },
     build: {
         // Conservative target: old launcher installs shipped Electron 17 (Chromium 98).
         target: 'chrome98',
-        rollupOptions: {
-            input: Object.fromEntries(Object.entries(pages).map(([name, file]) => [name, resolve(import.meta.dirname, file)])),
-        },
     },
 });

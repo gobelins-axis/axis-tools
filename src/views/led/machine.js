@@ -330,6 +330,12 @@ export class MachineScene {
             loadTexture(textureLoader, VENTILATION_URL),
         ]);
 
+        // Left the page while loading: nothing was uploaded to the GPU yet.
+        if (this.disposed) {
+            [mirror1, mirror2, clearSoft, ventilation].forEach((texture) => texture.dispose());
+            return;
+        }
+
         // Same assignment as the front's MachineComponent.
         const materials = {
             borne: matcapMaterial(mirror2, { color: '#414141' }),
@@ -408,7 +414,35 @@ export class MachineScene {
         this._frame();
     }
 
+    // Frees everything (the LED check is a route now: leaving it must not
+    // leak a WebGL context). Safe to call before load() has finished.
+    dispose() {
+        this.disposed = true;
+        window.removeEventListener('resize', this._resize);
+        this.renderer.setAnimationLoop(null);
+        clearTimeout(this.focus.returnTimer);
+        this.controls.dispose();
+        this.bloom.dispose();
+
+        const textures = new Set([this.screen.texture, this.strips.left.texture, this.strips.right.texture]);
+        this.scene.traverse((child) => {
+            if (!child.isMesh) return;
+            child.geometry.dispose();
+            const material = child.material;
+            Object.values(material.uniforms || {}).forEach((uniform) => {
+                if (uniform.value && uniform.value.isTexture) textures.add(uniform.value);
+            });
+            if (material.map) textures.add(material.map);
+            material.dispose();
+        });
+        textures.forEach((texture) => texture.dispose());
+
+        this.renderer.dispose();
+        this.renderer.forceContextLoss();
+    }
+
     start() {
+        if (this.disposed) return;
         window.addEventListener('resize', this._resize);
         this._resize();
         this.renderer.setAnimationLoop(this._tick);

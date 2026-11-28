@@ -116,6 +116,11 @@ class FullscreenPass {
         renderer.setRenderTarget(target);
         renderer.render(this.scene, this.camera);
     }
+
+    dispose() {
+        this.scene.traverse((child) => { if (child.isMesh) child.geometry.dispose(); });
+        this.material.dispose();
+    }
 }
 
 export class SelectiveBloom {
@@ -169,6 +174,14 @@ export class SelectiveBloom {
             depthWrite: false,
             transparent: true,
         }));
+    }
+
+    dispose() {
+        [this.targetMask, this.targetBloom, this.targetMasked, ...this.blurBuffers.map((buffer) => buffer.target)]
+            .forEach((target) => target.dispose());
+        [this.maskPass, this.compositePass, ...this.blurBuffers.map((buffer) => buffer.pass)]
+            .forEach((pass) => pass.dispose());
+        this.maskMaterial.dispose();
     }
 
     setSize(width, height) {

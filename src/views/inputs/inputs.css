@@ -1,0 +1,193 @@
+/* Input debugger: light, dense dev-tool look (kept from the standalone
+   joystick-debugger project). Every rule is scoped to the view's root
+   (.debugger) or to <html data-theme="dev"> (set by the router), so it never
+   reaches the cabinet pages, and src/styles/base.css never reaches it. */
+
+html:where([data-theme="dev"]),
+:where(html[data-theme="dev"]) body {
+    margin: 0;
+    padding: 0;
+    background: #f4f4f4;
+    color: #111;
+    font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.debugger .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+}
+
+.debugger h1 { font-size: 18px; margin: 0; }
+.debugger h2 { font-size: 15px; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+.debugger h3 { font-size: 12px; margin: 10px 0 4px; color: #555; text-transform: uppercase; }
+
+.debugger .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.debugger .pill {
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #eee;
+    border: 1px solid #ccc;
+    font-size: 12px;
+}
+.debugger .pill.ok { background: #d8f5dc; border-color: #6c6; }
+.debugger .pill.warn { background: #fde9c8; border-color: #e9a; }
+
+/* Left: machine inputs. Right: alternative controllers, full height. */
+.debugger .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 34%);
+    gap: 12px;
+    padding: 12px 16px;
+    align-items: start;
+}
+
+.debugger .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    min-width: 0;
+}
+
+.debugger .joysticks {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 12px;
+}
+
+.debugger .card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.debugger .log-card { grid-column: 1 / -1; }
+
+/* Alternative controllers */
+.debugger .alternatives-card {
+    position: sticky;
+    top: 12px;
+    /* Full column: from below the header (~50px) to the bottom of the screen. */
+    height: calc(100vh - 74px);
+    overflow-y: auto;
+}
+.debugger .alternatives { display: flex; flex-direction: column; gap: 12px; }
+.debugger .alternatives:empty { display: none; }
+.debugger .alternative { border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; }
+.debugger .alternative.disconnected { opacity: 0.5; }
+.debugger .alternative-title { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; color: #111; font-size: 13px; text-transform: none; }
+.debugger .alternative-meta { font-weight: normal; color: #666; font-size: 12px; }
+.debugger .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.debugger .badges:empty { display: none; }
+.debugger .badge { padding: 2px 6px; border-radius: 4px; background: #eee; border: 1px solid #ccc; font-size: 12px; transition: background 0.15s; }
+.debugger .badge b { font-weight: normal; color: #666; margin-right: 4px; }
+.debugger .badge.flash { background: #ffd54f; border-color: #e0a800; }
+.debugger .fields { display: flex; flex-direction: column; gap: 8px; }
+.debugger .field-head { display: flex; justify-content: space-between; font-size: 12px; }
+.debugger .field-name { color: #555; }
+.debugger .field-value { font-variant-numeric: tabular-nums; font-weight: bold; }
+.debugger .field-chart { width: 100%; height: 56px; background: #fafafa; border: 1px solid #ddd; display: block; }
+.debugger .field-range { font-size: 10px; color: #777; text-align: right; font-variant-numeric: tabular-nums; }
+
+.debugger .rate { font-weight: normal; color: #666; font-size: 12px; }
+
+.debugger .joystick-body { display: flex; gap: 16px; }
+
+.debugger .joystick canvas.js-canvas {
+    width: 150px;
+    height: 150px;
+    flex: none;
+    background: #fafafa;
+    border: 1px solid #ddd;
+}
+
+.debugger .readouts { flex: 1; min-width: 0; }
+.debugger .readouts table { border-collapse: collapse; width: 100%; }
+.debugger .readouts th { text-align: left; font-weight: normal; color: #666; padding: 1px 6px 1px 0; width: 45%; }
+.debugger .readouts td { text-align: right; padding: 1px 0; font-variant-numeric: tabular-nums; }
+
+.debugger .hint { font-size: 11px; color: #777; margin: 6px 0 0; }
+
+.debugger .actions { margin-top: 8px; display: flex; gap: 6px; }
+.debugger button {
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f7f7f7;
+    cursor: pointer;
+}
+.debugger button:active { background: #ddd; }
+
+.debugger .quickmove { display: flex; gap: 8px; margin: 10px 0; }
+.debugger .qm {
+    flex: 1;
+    text-align: center;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f7f7f7;
+    transition: background 0.15s;
+}
+.debugger .qm.active { background: #ffd54f; border-color: #e0a800; }
+.debugger .qm b { margin-left: 4px; }
+
+.debugger .chart { width: 100%; height: 60px; background: #fafafa; border: 1px solid #ddd; }
+
+.debugger .swatch { display: inline-block; width: 10px; height: 10px; vertical-align: middle; margin: 0 2px 0 6px; }
+.debugger .swatch.x { background: #1976d2; }
+.debugger .swatch.y { background: #d32f2f; }
+
+.debugger .button-groups { display: flex; gap: 20px; flex-wrap: wrap; }
+.debugger .buttons { display: flex; gap: 6px; }
+.debugger .btn {
+    width: 52px;
+    height: 52px;
+    border: 2px solid #bbb;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #f7f7f7;
+    transition: background 0.08s, border-color 0.08s;
+}
+.debugger .btn.down { background: #4caf50; border-color: #2e7d32; color: #fff; }
+.debugger .btn .key { font-size: 16px; font-weight: bold; line-height: 1; }
+.debugger .btn .count { font-size: 10px; color: inherit; opacity: 0.8; }
+
+.debugger label { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.debugger label input[type=range] { flex: 1; }
+
+.debugger .log {
+    margin: 0;
+    height: 220px;
+    overflow-y: auto;
+    background: #1b1b1b;
+    color: #ddd;
+    padding: 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 1000px) {
+    .debugger .layout { grid-template-columns: 1fr; }
+    .debugger .alternatives-card { position: static; max-height: none; }
+    .debugger .grid { grid-template-columns: 1fr; }
+    .debugger .joysticks { grid-template-columns: 1fr; }
+    .debugger .joystick-body { flex-direction: column; }
+}
+
+/* Way back to the hub (Home does the same through the exit overlay) */
+.debugger .back { color: inherit; text-decoration: none; margin-right: 8px; }
+.debugger .back:hover { text-decoration: underline; }
+.debugger .back-hint { font-size: 12px; font-weight: 400; color: #888; margin-left: 8px; }

@@ -20,9 +20,14 @@ npm run dev                   # http://localhost:8090
 ```
 
 Keyboard emulation: controller 1 = Q D Z S Space, controller 2 = ← → ↑ ↓ Enter,
-Escape = Home. On the hub, ↑ / ↓ move, Enter or A opens.
+Escape = Home. On the hub, ↑ / ↓ move, Enter or A opens. A gamepad works too: sticks =
+joysticks, buttons 0–3 / 4–7 = A X I S of controllers 1 / 2, d-pad ← → = W1 / W2.
 
-`npm run build` writes the static site to `dist/` (Netlify config included).
+Vue 3 single-page app (vue-router): `/` is the tool picker, each tool lives at
+`/tools/<id>/`. See `CLAUDE.md` for the structure.
+
+`npm run build` writes the static site to `dist/` (Netlify config included, with the
+SPA rewrite).
 
 ## On the machine
 
