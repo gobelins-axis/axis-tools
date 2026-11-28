@@ -89,8 +89,9 @@
 .pad {
     position: relative;
     /* Sized by width like the front, capped by height so short windows never overlap the heading */
-    width: min(15rem, 30vh);
-    height: min(15rem, 30vh);
+    /* In vh only: the dot travel (DOT_RADIUS in calibration.js) is half of it */
+    width: 26vh;
+    height: 26vh;
     background: var(--black-1);
     border-radius: 50%;
 }

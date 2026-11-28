@@ -36,7 +36,7 @@ const MIN_RANGE_SPAN = 200;
 // Minimum normalized deflection to accept a "push right" / "push up" sample.
 const MIN_DIRECTION_DEFLECTION = 0.5;
 // Dot travel inside a pad, in vh (half the pad minus the dot).
-const DOT_RADIUS = 15;
+const DOT_RADIUS = 13;
 
 const TEXTS = {
     intro: {

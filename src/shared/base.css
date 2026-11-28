@@ -2,7 +2,8 @@
  * Design system shared by the hub and the cabinet-style tools.
  * Source of truth: axis-launcher-front (palette, Darker Grotesque, InputIndicator
  * sizes). 1rem = 1vw, values are px / 25.6 against the 2560 reference, like
- * rem(px, 'large') in the front.
+ * rem(px, 'large') in the front, then everything scaled to 85% through the root
+ * font-size (1rem = 0.85vw).
  */
 
 @font-face { font-family: 'Darker Grotesque'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/DarkerGrotesque-Medium.ttf') format('truetype'); }
@@ -26,7 +27,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 
-html { font-size: 1vw; }
+html { font-size: 0.85vw; }
 html, body { width: 100%; height: 100%; overflow: hidden; }
 
 body {
@@ -55,7 +56,8 @@ body {
     gap: 1.6rem;
 }
 
-.logo { display: block; width: auto; height: 5.2rem; }
+/* Small logo, top left */
+.logo { display: block; width: auto; height: 2.6rem; }
 
 /* GameTag pill from the front */
 .tag {
@@ -80,7 +82,7 @@ body {
     min-height: 0;
 }
 
-.heading { max-width: 46rem; margin-top: 1.4rem; }
+.heading { max-width: 46rem; margin-top: 3.4rem; }
 
 .title {
     font-weight: 800;
@@ -149,10 +151,10 @@ body {
 }
 
 .input-icon {
-    /* The front renders the glyph at its intrinsic 42px */
+    /* The front renders the glyph at its intrinsic 42px; 85% like the rest */
     display: block;
     width: auto;
-    height: 42px;
+    height: 36px;
     flex: none;
 }
 
